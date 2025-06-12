@@ -1,20 +1,17 @@
 import 'package:flutter/material.dart';
+import '../models/meditation_model.dart';
 import '../utils/theme.dart';
 
 class MeditationSessionCard extends StatelessWidget {
-  final String title;
-  final String duration;
-  final String category;
-  final VoidCallback onTap;
-  final String? imageUrl;
+  final MeditationSession session;
+  final VoidCallback? onTap;
+  final bool showDetails;
 
   const MeditationSessionCard({
     super.key,
-    required this.title,
-    required this.duration,
-    required this.category,
-    required this.onTap,
-    this.imageUrl,
+    required this.session,
+    this.onTap,
+    this.showDetails = true,
   });
 
   @override
@@ -23,87 +20,126 @@ class MeditationSessionCard extends StatelessWidget {
       onTap: onTap,
       child: Container(
         width: 180,
+        margin: const EdgeInsets.only(right: 16),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              spreadRadius: 1,
-              blurRadius: 6,
-              offset: const Offset(0, 2),
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Session image
-            ClipRRect(
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                topRight: Radius.circular(16),
-              ),
-              child: imageUrl != null
-                  ? Image.network(
-                      imageUrl!,
-                      height: 100,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                    )
-                  : Container(
-                      height: 100,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            AppTheme.primaryColor.withOpacity(0.7),
-                            AppTheme.secondaryColor.withOpacity(0.7),
-                          ],
-                        ),
-                      ),
-                      child: const Icon(
-                        Icons.spa,
-                        color: Colors.white,
-                        size: 40,
-                      ),
-                    ),
-            ),
-            // Session details
-            Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      _buildInfoChip(Icons.category, category),
-                      const SizedBox(width: 8),
-                      _buildInfoChip(Icons.timer, duration),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Image section
+              _buildImageSection(),
+              
+              // Info section
+              if (showDetails) _buildInfoSection(context),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildInfoChip(IconData icon, String label) {
+  Widget _buildImageSection() {
+    return Container(
+      height: 120,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        image: session.imageUrl != null && session.imageUrl!.isNotEmpty
+            ? DecorationImage(
+                image: NetworkImage(session.imageUrl!),
+                fit: BoxFit.cover,
+              )
+            : null,
+        gradient: session.imageUrl == null || session.imageUrl!.isEmpty
+            ? LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppTheme.primaryColor.withOpacity(0.7),
+                  AppTheme.primaryColor,
+                ],
+              )
+            : null,
+      ),
+      child: session.imageUrl == null || session.imageUrl!.isEmpty
+          ? Center(
+              child: Icon(
+                Icons.spa,
+                color: Colors.white,
+                size: 40,
+              ),
+            )
+          : null,
+    );
+  }
+
+  Widget _buildInfoSection(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      color: Colors.white,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            session.title,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              _buildInfoChip(
+                icon: Icons.category,
+                label: session.category,
+              ),
+              const SizedBox(width: 8),
+              _buildInfoChip(
+                icon: Icons.timer,
+                label: '${session.durationInMinutes} min',
+              ),
+            ],
+          ),
+          if (session.isCompleted)
+            Padding(
+              padding: const EdgeInsets.only(top: 8.0),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.check_circle,
+                    color: Colors.green,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Completed',
+                    style: TextStyle(
+                      color: Colors.green,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoChip({required IconData icon, required String label}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -123,7 +159,8 @@ class MeditationSessionCard extends StatelessWidget {
             label,
             style: TextStyle(
               fontSize: 12,
-              color: AppTheme.textPrimaryColor,
+              color: AppTheme.primaryColor,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],

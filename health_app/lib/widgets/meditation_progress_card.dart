@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
 import '../utils/theme.dart';
+import '../models/meditation_model.dart';
 
 class MeditationProgressCard extends StatelessWidget {
-  const MeditationProgressCard({super.key});
+  final MeditationSummary? summary;
+
+  const MeditationProgressCard({super.key, this.summary});
 
   @override
   Widget build(BuildContext context) {
-    // Mock data for meditation progress
-    const totalMinutes = 120;
-    const sessionsCompleted = 8;
-    const currentStreak = 5;
-    const longestStreak = 14;
+    // Use real data if available, otherwise use mock data
+    final totalMinutes = summary?.totalMinutes ?? 120;
+    final sessionsCompleted = summary?.sessionsCompleted ?? 8;
+    final currentStreak = summary?.currentStreak ?? 5;
+    final longestStreak = 14; // This could be stored in the user profile in a real app
 
     return Card(
       elevation: 4,
@@ -77,16 +80,8 @@ class MeditationProgressCard extends StatelessWidget {
   }
 
   Widget _buildWeeklyProgress(BuildContext context) {
-    // Mock data for weekly meditation minutes
-    final weeklyData = [
-      {'day': 'Mon', 'minutes': 15},
-      {'day': 'Tue', 'minutes': 20},
-      {'day': 'Wed', 'minutes': 10},
-      {'day': 'Thu', 'minutes': 15},
-      {'day': 'Fri', 'minutes': 25},
-      {'day': 'Sat', 'minutes': 0}, // Today (not yet completed)
-      {'day': 'Sun', 'minutes': 0}, // Future
-    ];
+    // Generate weekly data based on summary or use mock data
+    final weeklyData = _generateWeeklyData();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -107,10 +102,53 @@ class MeditationProgressCard extends StatelessWidget {
     );
   }
 
+  List<Map<String, dynamic>> _generateWeeklyData() {
+    // In a real app, this would come from a database or API
+    // For now, we'll use mock data or generate based on the summary
+    
+    // Get the current day of the week (0 = Monday, 6 = Sunday)
+    final now = DateTime.now();
+    final currentDayOfWeek = (now.weekday - 1) % 7;
+    
+    // Day names
+    final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    
+    // Generate data for each day
+    final weeklyData = <Map<String, dynamic>>[];
+    
+    for (var i = 0; i < 7; i++) {
+      // Determine if this day is today, in the past, or in the future
+      final isToday = i == currentDayOfWeek;
+      final isPast = i < currentDayOfWeek;
+      final isFuture = i > currentDayOfWeek;
+      
+      // For past days, generate some random minutes
+      // For today, use the summary data if available
+      // For future days, set to 0
+      int minutes = 0;
+      
+      if (isPast) {
+        // Generate some random minutes for past days
+        minutes = [0, 5, 10, 15, 20, 25].elementAt(i % 6);
+      } else if (isToday && summary != null) {
+        minutes = summary!.totalMinutes;
+      }
+      
+      weeklyData.add({
+        'day': dayNames[i],
+        'minutes': minutes,
+        'isToday': isToday,
+        'isFuture': isFuture,
+      });
+    }
+    
+    return weeklyData;
+  }
+
   Widget _buildDayColumn(Map<String, dynamic> day) {
     final minutes = day['minutes'] as int;
-    final isToday = day['day'] == 'Sat'; // Mock today as Saturday
-    final isFuture = day['day'] == 'Sun'; // Mock future as Sunday
+    final isToday = day['isToday'] as bool;
+    final isFuture = day['isFuture'] as bool;
     
     // Calculate height based on minutes (max height for 30 minutes)
     final barHeight = minutes > 0 ? (minutes / 30) * 100 : 0.0;
@@ -119,7 +157,7 @@ class MeditationProgressCard extends StatelessWidget {
     return Column(
       children: [
         Text(
-          '${day['minutes']}',
+          '$minutes',
           style: TextStyle(
             fontWeight: FontWeight.bold,
             color: minutes > 0 ? AppTheme.textPrimaryColor : AppTheme.textSecondaryColor,

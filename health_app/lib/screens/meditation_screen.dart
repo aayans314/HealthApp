@@ -3,6 +3,9 @@ import '../utils/constants.dart';
 import '../utils/theme.dart';
 import '../widgets/meditation_session_card.dart';
 import '../widgets/meditation_progress_card.dart';
+import '../services/meditation_service.dart';
+import '../models/meditation_model.dart';
+import 'meditation_session_screen.dart';
 
 class MeditationScreen extends StatefulWidget {
   const MeditationScreen({super.key});
@@ -21,6 +24,58 @@ class _MeditationScreenState extends State<MeditationScreen> {
   ];
   
   String _selectedCategory = 'All';
+  final MeditationService _meditationService = MeditationService();
+  List<MeditationSession> _recentSessions = [];
+  List<MeditationProgram> _programs = [];
+  MeditationSummary? _userSummary;
+  
+  @override
+  void initState() {
+    super.initState();
+    // Initialize meditation data
+    _initializeMeditationData();
+    
+    // Listen to meditation data streams
+    _meditationService.sessionsStream.listen((sessions) {
+      if (mounted) {
+        setState(() {
+          _recentSessions = _meditationService.getRecentSessions();
+        });
+      }
+    });
+    
+    _meditationService.programsStream.listen((programs) {
+      if (mounted) {
+        setState(() {
+          _programs = programs;
+        });
+      }
+    });
+    
+    _meditationService.summaryStream.listen((summary) {
+      if (mounted) {
+        setState(() {
+          _userSummary = summary;
+        });
+      }
+    });
+  }
+  
+  void _initializeMeditationData() {
+    // Add sample data if not already added
+    if (_meditationService.getAllPrograms().isEmpty) {
+      _meditationService.addSamplePrograms();
+    }
+    
+    if (_meditationService.getUserSessions().isEmpty) {
+      _meditationService.addSampleSessions();
+    }
+    
+    // Get initial data
+    _recentSessions = _meditationService.getRecentSessions();
+    _programs = _meditationService.getAllPrograms();
+    _userSummary = _meditationService.getUserSummary();
+  }
   
   @override
   Widget build(BuildContext context) {
@@ -34,7 +89,7 @@ class _MeditationScreenState extends State<MeditationScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Meditation progress
-            const MeditationProgressCard(),
+            MeditationProgressCard(summary: _userSummary),
             const SizedBox(height: 24),
             
             // Category filter
@@ -62,7 +117,13 @@ class _MeditationScreenState extends State<MeditationScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
-          // TODO: Start quick meditation
+          // Start quick meditation (5-minute breathing exercise)
+          _startMeditationSession(
+            'Quick Breathing',
+            AppConstants.breathingExercises,
+            5,
+            'A short breathing exercise to calm your mind.',
+          );
         },
         backgroundColor: AppTheme.primaryColor,
         icon: const Icon(Icons.play_arrow),
@@ -171,7 +232,13 @@ class _MeditationScreenState extends State<MeditationScreen> {
                     children: [
                       ElevatedButton.icon(
                         onPressed: () {
-                          // TODO: Start featured session
+                          _startMeditationSession(
+                            'Calm Mind Meditation',
+                            AppConstants.guidedMeditation,
+                            15,
+                            'A guided meditation to calm your mind and reduce stress',
+                            'https://via.placeholder.com/400x200',
+                          );
                         },
                         icon: const Icon(Icons.play_arrow),
                         label: const Text('Start'),
@@ -200,40 +267,46 @@ class _MeditationScreenState extends State<MeditationScreen> {
   }
   
   Widget _buildRecommendedSessions() {
-    // Mock data for recommended sessions
-    final recommendedSessions = [
-      {
-        'title': 'Morning Mindfulness',
-        'duration': '10 min',
-        'category': AppConstants.mindfulness,
-      },
-      {
-        'title': 'Deep Breathing',
-        'duration': '5 min',
-        'category': AppConstants.breathingExercises,
-      },
-      {
-        'title': 'Stress Relief',
-        'duration': '15 min',
-        'category': AppConstants.guidedMeditation,
-      },
-    ];
+    // Filter programs based on selected category
+    final filteredPrograms = _selectedCategory == 'All'
+        ? _programs
+        : _programs.where((program) => program.category == _selectedCategory.toLowerCase()).toList();
+    
+    if (filteredPrograms.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(16.0),
+          child: Text('No programs available for this category.'),
+        ),
+      );
+    }
     
     return SizedBox(
       height: 180,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        itemCount: recommendedSessions.length,
+        itemCount: filteredPrograms.length,
         itemBuilder: (context, index) {
-          final session = recommendedSessions[index];
+          final program = filteredPrograms[index];
+          // Create a MeditationSession from the program for display
+          final session = MeditationSession(
+            id: program.id,
+            userId: 'user123',
+            title: program.title,
+            category: program.category,
+            startTime: DateTime.now(),
+            durationInMinutes: program.totalMinutes ~/ program.durationInDays, // Average per day
+            imageUrl: program.imageUrl,
+            description: program.description,
+          );
+          
           return Padding(
             padding: const EdgeInsets.only(right: 16.0),
             child: MeditationSessionCard(
-              title: session['title'] as String,
-              duration: session['duration'] as String,
-              category: session['category'] as String,
+              session: session,
               onTap: () {
-                // TODO: Navigate to session details
+                // Show program details
+                _showProgramDetails(program);
               },
             ),
           );
@@ -243,34 +316,35 @@ class _MeditationScreenState extends State<MeditationScreen> {
   }
   
   Widget _buildRecentSessions() {
-    // Mock data for recent sessions
-    final recentSessions = [
-      {
-        'title': 'Sleep Story: Ocean Waves',
-        'duration': '20 min',
-        'category': AppConstants.sleepStories,
-        'completed': true,
-      },
-      {
-        'title': 'Anxiety Relief',
-        'duration': '15 min',
-        'category': AppConstants.guidedMeditation,
-        'completed': true,
-      },
-      {
-        'title': 'Body Scan Relaxation',
-        'duration': '10 min',
-        'category': AppConstants.mindfulness,
-        'completed': false,
-      },
-    ];
+    if (_recentSessions.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(16.0),
+          child: Text('No recent sessions. Start meditating to see your history.'),
+        ),
+      );
+    }
+    
+    // Filter sessions based on selected category
+    final filteredSessions = _selectedCategory == 'All'
+        ? _recentSessions
+        : _recentSessions.where((session) => session.category == _selectedCategory).toList();
+    
+    if (filteredSessions.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(16.0),
+          child: Text('No recent sessions for this category.'),
+        ),
+      );
+    }
     
     return ListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      itemCount: recentSessions.length,
+      itemCount: filteredSessions.length,
       itemBuilder: (context, index) {
-        final session = recentSessions[index];
+        final session = filteredSessions[index];
         return ListTile(
           leading: CircleAvatar(
             backgroundColor: AppTheme.primaryColor.withOpacity(0.2),
@@ -279,21 +353,246 @@ class _MeditationScreenState extends State<MeditationScreen> {
               color: AppTheme.primaryColor,
             ),
           ),
-          title: Text(session['title'] as String),
-          subtitle: Text('${session['category']} • ${session['duration']}'),
-          trailing: (session['completed'] as bool)
+          title: Text(session.title),
+          subtitle: Text('${session.category} • ${session.durationInMinutes} min'),
+          trailing: session.isCompleted
               ? const Icon(Icons.check_circle, color: AppTheme.successColor)
               : IconButton(
                   icon: const Icon(Icons.play_circle_filled, color: AppTheme.primaryColor),
                   onPressed: () {
-                    // TODO: Resume session
+                    // Resume session
+                    _startMeditationSession(
+                      session.title,
+                      session.category,
+                      session.durationInMinutes,
+                      session.description,
+                      session.imageUrl,
+                      session.audioUrl,
+                    );
                   },
                 ),
           onTap: () {
-            // TODO: Navigate to session details
+            // Show session details
+            _showSessionDetails(session);
           },
         );
       },
+    );
+  }
+  
+  void _startMeditationSession(
+    String title,
+    String category,
+    int durationInMinutes,
+    String? description,
+    [String? imageUrl, String? audioUrl]
+  ) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MeditationSessionScreen(
+          title: title,
+          category: category,
+          durationInMinutes: durationInMinutes,
+          description: description,
+          imageUrl: imageUrl,
+          audioUrl: audioUrl,
+        ),
+      ),
+    );
+  }
+  
+  void _showProgramDetails(MeditationProgram program) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        maxChildSize: 0.9,
+        minChildSize: 0.5,
+        expand: false,
+        builder: (context, scrollController) {
+          return SingleChildScrollView(
+            controller: scrollController,
+            child: Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Program image
+                  if (program.imageUrl != null)
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: Image.network(
+                        program.imageUrl!,
+                        height: 200,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  const SizedBox(height: 16),
+                  
+                  // Program title
+                  Text(
+                    program.title,
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  
+                  // Program details
+                  Row(
+                    children: [
+                      Icon(Icons.calendar_today, size: 16, color: AppTheme.textSecondaryColor),
+                      const SizedBox(width: 4),
+                      Text('${program.durationInDays} days'),
+                      const SizedBox(width: 16),
+                      Icon(Icons.timer, size: 16, color: AppTheme.textSecondaryColor),
+                      const SizedBox(width: 4),
+                      Text('${program.totalMinutes} min total'),
+                    ],
+                  ),
+                  if (program.instructorName != null) ...[  
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(Icons.person, size: 16, color: AppTheme.textSecondaryColor),
+                        const SizedBox(width: 4),
+                        Text('Instructor: ${program.instructorName}'),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  
+                  // Program description
+                  Text(
+                    program.description,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 24),
+                  
+                  // Start program button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        // Start the first session of the program
+                        _startMeditationSession(
+                          'Day 1: ${program.title}',
+                          program.category,
+                          15, // Default duration for first session
+                          'First session of ${program.title} program',
+                          program.imageUrl,
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryColor,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      child: const Text('Start Program'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+  
+  void _showSessionDetails(MeditationSession session) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              session.title,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(Icons.category, size: 16, color: AppTheme.textSecondaryColor),
+                const SizedBox(width: 4),
+                Text(session.category),
+                const SizedBox(width: 16),
+                Icon(Icons.timer, size: 16, color: AppTheme.textSecondaryColor),
+                const SizedBox(width: 4),
+                Text('${session.durationInMinutes} min'),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(Icons.calendar_today, size: 16, color: AppTheme.textSecondaryColor),
+                const SizedBox(width: 4),
+                Text(
+                  '${session.startTime.day}/${session.startTime.month}/${session.startTime.year}',
+                ),
+                const SizedBox(width: 16),
+                Icon(Icons.access_time, size: 16, color: AppTheme.textSecondaryColor),
+                const SizedBox(width: 4),
+                Text(
+                  '${session.startTime.hour}:${session.startTime.minute.toString().padLeft(2, '0')}',
+                ),
+              ],
+            ),
+            if (session.description != null) ...[  
+              const SizedBox(height: 16),
+              Text(
+                session.description!,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ],
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: AppTheme.primaryColor),
+                    ),
+                    child: const Text('Close'),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _startMeditationSession(
+                        session.title,
+                        session.category,
+                        session.durationInMinutes,
+                        session.description,
+                        session.imageUrl,
+                        session.audioUrl,
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryColor,
+                    ),
+                    child: Text(session.isCompleted ? 'Repeat Session' : 'Continue'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
