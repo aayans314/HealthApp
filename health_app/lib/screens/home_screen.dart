@@ -6,6 +6,9 @@ import '../widgets/health_metrics_card.dart';
 import '../widgets/upcoming_goals_card.dart';
 import '../widgets/recent_activities_card.dart';
 import '../widgets/health_tips_card.dart';
+import '../widgets/notification_badge.dart';
+import '../services/notification_service.dart';
+import '../screens/notifications_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -15,17 +18,37 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final NotificationService _notificationService = NotificationService();
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text(AppConstants.appName),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () {
-              // TODO: Navigate to notifications
-            },
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.notifications_outlined),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const NotificationsScreen(),
+                    ),
+                  );
+                },
+              ),
+              Positioned(
+                top: 8,
+                right: 8,
+                child: NotificationBadge(
+                  notificationService: _notificationService,
+                  size: 18.0,
+                ),
+              ),
+            ],
           ),
           IconButton(
             icon: const Icon(Icons.settings_outlined),

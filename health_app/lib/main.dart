@@ -8,6 +8,7 @@ import 'screens/profile_screen.dart';
 import 'utils/theme.dart';
 import 'utils/constants.dart';
 import 'widgets/bottom_nav_bar.dart';
+import 'services/notification_service.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,6 +16,12 @@ void main() {
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
+  
+  // Initialize notification service
+  final notificationService = NotificationService();
+  // Add some sample notifications for testing
+  notificationService.addSampleNotifications();
+  
   runApp(const MyApp());
 }
 
